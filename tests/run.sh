@@ -134,20 +134,23 @@ test_packup_success() {
 }
 
 test_packup_dirty_main() {
-  local repo gtree_dir out status repo_name
+  local repo gtree_dir out status repo_name main_branch_before main_branch_after
   repo="$(create_repo)"
   repo_name="$(basename "$repo")"
   gtree_dir="$(cd "$(make_temp_dir)" && pwd -P)"
   (cd "$repo" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" add feature)
   echo "change" >> "$repo/README"
-  out="$(cd "$gtree_dir/$repo_name/feature" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" packup 2>&1)"
+  main_branch_before="$(git -C "$repo" symbolic-ref --quiet --short HEAD)"
+  out="$(cd "$gtree_dir/$repo_name/feature" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" packup)"
   status=$?
-  if [[ $status -eq 0 ]]; then
-    echo "expected non-zero exit"
+  if [[ $status -ne 0 ]]; then
+    echo "expected zero exit"
     return 1
   fi
-  assert_contains "$out" "changes detected. check out worktree with git checkout feature" || return 1
-  assert_file_exists "$gtree_dir/$repo_name/feature" || return 1
+  assert_eq "$repo" "$(cd "$out" && pwd -P)" || return 1
+  assert_file_missing "$gtree_dir/$repo_name/feature" || return 1
+  main_branch_after="$(git -C "$repo" symbolic-ref --quiet --short HEAD)"
+  assert_eq "$main_branch_before" "$main_branch_after" || return 1
 }
 
 test_init_output() {

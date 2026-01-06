@@ -158,8 +158,10 @@ case "$cmd" in
     require_clean_worktree
     branch="$(git symbolic-ref --quiet --short HEAD)" || die "detached HEAD"
     if git -C "$primary_path" status --porcelain | grep -Eq '^.[^ ]'; then
-      echo "changes detected. check out worktree with git checkout $branch"
-      exit 1
+      git worktree remove "$current_path"
+      echo "changes detected. skipped checkout for $branch" >&2
+      echo "$primary_path"
+      exit 0
     fi
     git worktree remove "$current_path"
     git -C "$primary_path" checkout "$branch"
