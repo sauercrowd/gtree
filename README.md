@@ -2,6 +2,8 @@
 
 An simple convention based, auto-complete enabled helper to deal with git worktrees.
 
+For bash/zsh.
+
 ## Usage
 
 ```sh
@@ -21,8 +23,14 @@ If you need to briefly need to jump to your main repo, just use `gtree cd` to ge
 
 ## Install
 
-Put `gtree` on your `PATH`, then enable the shell function:
+In a directory that's in your path
+```
+curl -o gtree https://raw.githubusercontent.com/sauercrowd/gtree/refs/heads/main/gtree
+chmod +x gtree
+```
 
+
+In our ~/.profile, add to make `gtree cd` work
 ```sh
 eval "$(gtree init)"
 ```
