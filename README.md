@@ -15,6 +15,10 @@ jonas@ente:~/git/my-repo$ git branch
   my-feature
 ```
 
+git packup deletes the worktree and changes back to the main repo. With `gtree packup -c` you can optionally immediately check out the worktree branch
+
+If you need to briefly need to jump to your main repo, just use `gtree cd` to get there, and jump back to the worktree with `gtree cd <branch>` (supports auto-complete)
+
 ## Usage
 
 ```sh
@@ -25,10 +29,7 @@ gtree packup [-f] [-c] # remove worktree directory and return to main repo. -c t
 gtree ls             # list worktrees under $GTREE_DIR
 ```
 
-
-git packup deletes the worktree and changes back to the main repo. With `gtree packup -c` you can optionally immediately check out the worktree branch
-
-If you need to briefly need to jump to your main repo, just use `gtree cd` to get there, and jump back to the worktree with `gtree cd <branch>` (supports auto-complete)
+The location for worktrees can be overwritten by setting `GTREE_DIR_DEFAULT`
 
 ## Install
 
