@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+GTREE_DIR_DEFAULT="${HOME}/.gtree/trees"
+GTREE_DIR="${GTREE_DIR:-$GTREE_DIR_DEFAULT}"
+
+usage() {
+  cat <<'USAGE'
+Usage: gtree <command> [branch]
+
+Commands:
+  add <branch>   Create/add a worktree in $GTREE_DIR
+  rm <branch>    Remove the worktree for <branch>
+  cd [branch]    Print the worktree path (or the main repo when omitted)
+  packup [-f]    If clean, remove the current worktree and checkout its branch in main
+  ls             List worktrees under $GTREE_DIR
+  init           Print a shell function to enable gtree cd
+USAGE
+}
+
+die() {
+  echo "gtree: $*" >&2
+  exit 1
+}
+
+require_git_repo() {
+  git rev-parse --show-toplevel >/dev/null 2>&1 || die "not inside a git repository"
+}
+
+ensure_dir() {
+  mkdir -p "$GTREE_DIR"
+}
+
+branch_exists() {
+  git show-ref --verify --quiet "refs/heads/$1"
+}
+
+worktree_path_for_branch() {
+  local branch="$1"
+  local path=""
+  local wt=""
+  local br=""
+  local in_block=0
+
+  while IFS= read -r line; do
+    case "$line" in
+      worktree\ *)
+        wt="${line#worktree }"
+        br=""
+        in_block=1
+        ;;
+      branch\ *)
+        br="${line#branch refs/heads/}"
+        ;;
+      "")
+        if [[ $in_block -eq 1 && "$br" == "$branch" ]]; then
+          path="$wt"
+          break
+        fi
+        in_block=0
+        ;;
+    esac
+  done < <(git worktree list --porcelain)
+
+  if [[ -n "$path" ]]; then
+    echo "$path"
+    return 0
+  fi
+
+  return 1
+}
+
+primary_worktree_path() {
+  local line=""
+  while IFS= read -r line; do
+    case "$line" in
+      worktree\ *)
+        echo "${line#worktree }"
+        return 0
+        ;;
+    esac
+  done < <(git worktree list --porcelain)
+  return 1
+}
+
+require_clean_worktree() {
+  if [[ -n "$(git status --porcelain)" ]]; then
+    die "working tree has uncommitted changes (use -f to discard unstaged/untracked)"
+  fi
+}
+
+cmd="${1:-}"
+case "$cmd" in
+  add)
+    branch="${2:-}"
+    [[ -n "$branch" ]] || die "missing branch name"
+    require_git_repo
+    ensure_dir
+    path="${GTREE_DIR%/}/$branch"
+    if [[ -e "$path" ]]; then
+      die "path already exists: $path"
+    fi
+    if branch_exists "$branch"; then
+      git worktree add "$path" "$branch"
+    else
+      git worktree add -b "$branch" "$path"
+    fi
+    ;;
+  rm)
+    branch="${2:-}"
+    [[ -n "$branch" ]] || die "missing branch name"
+    require_git_repo
+    if path="$(worktree_path_for_branch "$branch")"; then
+      git worktree remove "$path"
+    else
+      path="${GTREE_DIR%/}/$branch"
+      [[ -d "$path" ]] || die "no worktree for branch: $branch"
+      git worktree remove "$path"
+    fi
+    ;;
+  cd)
+    branch="${2:-}"
+    require_git_repo
+    if [[ -z "$branch" ]]; then
+      path="$(primary_worktree_path)" || die "could not resolve main worktree"
+      echo "$path"
+    else
+      path="${GTREE_DIR%/}/$branch"
+      [[ -d "$path" ]] || die "no worktree directory: $path"
+      echo "$path"
+    fi
+    ;;
+  packup)
+    require_git_repo
+    force="${2:-}"
+    if [[ -n "$force" && "$force" != "-f" ]]; then
+      die "usage: gtree packup [-f]"
+    fi
+    current_path="$(git rev-parse --show-toplevel)"
+    primary_path="$(primary_worktree_path)" || die "could not resolve main worktree"
+    if [[ "$current_path" == "$primary_path" ]]; then
+      die "already in main worktree"
+    fi
+    if [[ "$force" == "-f" ]]; then
+      git checkout -- .
+      git clean -fd
+    fi
+    require_clean_worktree
+    branch="$(git symbolic-ref --quiet --short HEAD)" || die "detached HEAD"
+    if git -C "$primary_path" status --porcelain | grep -Eq '^.[^ ]'; then
+      echo "changes detected. check out worktree with git checkout $branch"
+      exit 1
+    fi
+    git worktree remove "$current_path"
+    git -C "$primary_path" checkout "$branch"
+    echo "$primary_path"
+    ;;
+  ls)
+    require_git_repo
+    ensure_dir
+    prefix="${GTREE_DIR%/}/"
+    wt=""
+    br=""
+    in_block=0
+    while IFS= read -r line; do
+      case "$line" in
+        worktree\ *)
+          wt="${line#worktree }"
+          br=""
+          in_block=1
+          ;;
+        branch\ *)
+          br="${line#branch refs/heads/}"
+          ;;
+        "")
+          if [[ $in_block -eq 1 && "$wt" == "$prefix"* ]]; then
+            if [[ -n "$br" ]]; then
+              echo "$br"
+            else
+              echo "${wt#"$prefix"} (detached)"
+            fi
+          fi
+          in_block=0
+          ;;
+      esac
+    done < <(git worktree list --porcelain)
+    ;;
+  init)
+    cat <<'SH'
+gtree() {
+  local __gtree_bin;
+  if [[ -n "${ZSH_VERSION:-}" ]]; then
+    __gtree_bin="$(whence -p gtree 2>/dev/null || true)";
+  else
+    __gtree_bin="$(type -P gtree 2>/dev/null || true)";
+  fi;
+  if [[ -z "$__gtree_bin" ]]; then
+    echo "gtree: could not resolve binary path" >&2;
+    return 1;
+  fi;
+  if [[ "${1:-}" == "cd" || "${1:-}" == "packup" ]]; then
+    local dir;
+    dir="$("$__gtree_bin" "$@")" || return;
+    builtin cd "$dir";
+  elif [[ "${1:-}" == "add" ]]; then
+    local dir;
+    "$__gtree_bin" "$@" || return;
+    dir="$("$__gtree_bin" cd "${2:-}")" || return;
+    builtin cd "$dir";
+  else
+    "$__gtree_bin" "$@";
+  fi;
+};
+
+_gtree_complete() {
+  local __gtree_bin;
+  if [[ -n "${ZSH_VERSION:-}" ]]; then
+    __gtree_bin="$(whence -p gtree 2>/dev/null || true)";
+  else
+    __gtree_bin="$(command -v gtree 2>/dev/null || true)";
+  fi;
+  [[ -n "$__gtree_bin" ]] || return 0;
+
+  if [[ -n "${ZSH_VERSION:-}" ]]; then
+    local -a cmds;
+    cmds=(add rm cd packup ls init);
+    if (( CURRENT == 2 )); then
+      compadd -- "${cmds[@]}";
+      return;
+    fi;
+    if (( CURRENT == 3 )) && [[ "${words[2]}" == "cd" || "${words[2]}" == "rm" ]]; then
+      compadd -- "$("$__gtree_bin" ls)";
+    fi;
+  else
+    local cur prev;
+    cur="${COMP_WORDS[COMP_CWORD]}";
+    prev="${COMP_WORDS[COMP_CWORD-1]}";
+    if [[ $COMP_CWORD -eq 1 ]]; then
+      COMPREPLY=( $(compgen -W "add rm cd packup ls init" -- "$cur") );
+      return;
+    fi;
+    if [[ $COMP_CWORD -eq 2 && ( "$prev" == "cd" || "$prev" == "rm" ) ]]; then
+      COMPREPLY=( $(compgen -W "$("$__gtree_bin" ls)" -- "$cur") );
+    fi;
+  fi;
+};
+
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+  compdef _gtree_complete gtree;
+elif [[ -n "${BASH_VERSION:-}" ]]; then
+  complete -F _gtree_complete gtree;
+fi;
+SH
+    ;;
+  ""|-h|--help|help)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac
