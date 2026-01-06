@@ -126,7 +126,7 @@ test_packup_success() {
   repo_name="$(basename "$repo")"
   gtree_dir="$(cd "$(make_temp_dir)" && pwd -P)"
   (cd "$repo" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" add feature)
-  out="$(cd "$gtree_dir/$repo_name/feature" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" packup)"
+  out="$(cd "$gtree_dir/$repo_name/feature" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" packup -c)"
   assert_eq "$repo" "$(cd "$out" && pwd -P)" || return 1
   assert_file_missing "$gtree_dir/$repo_name/feature" || return 1
   branch="$(git -C "$repo" symbolic-ref --quiet --short HEAD)"

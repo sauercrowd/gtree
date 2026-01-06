@@ -12,7 +12,7 @@ Commands:
   add <branch>   Create/add a worktree in $GTREE_DIR
   rm <branch>    Remove the worktree for <branch>
   cd [branch]    Print the worktree path (or the main repo when omitted)
-  packup [-f]    If clean, remove the current worktree and checkout its branch in main
+  packup [-f] [-c] If clean and -c set, remove the current worktree and checkout its branch in main
   ls             List worktrees under $GTREE_DIR
   init           Print a shell function to enable gtree cd
 USAGE
@@ -142,29 +142,42 @@ case "$cmd" in
     ;;
   packup)
     require_git_repo
-    force="${2:-}"
-    if [[ -n "$force" && "$force" != "-f" ]]; then
-      die "usage: gtree packup [-f]"
-    fi
+    force=0
+    do_checkout=0
+    shift
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        -f)
+          force=1
+          ;;
+        -c)
+          do_checkout=1
+          ;;
+        *)
+          die "usage: gtree packup [-f] [-c]"
+          ;;
+      esac
+      shift
+    done
     current_path="$(git rev-parse --show-toplevel)"
     primary_path="$(primary_worktree_path)" || die "could not resolve main worktree"
     if [[ "$current_path" == "$primary_path" ]]; then
       die "already in main worktree"
     fi
-    if [[ "$force" == "-f" ]]; then
+    if [[ $force -eq 1 ]]; then
       git checkout -- .
       git clean -fd
     fi
     require_clean_worktree
     branch="$(git symbolic-ref --quiet --short HEAD)" || die "detached HEAD"
-    if git -C "$primary_path" status --porcelain | grep -Eq '^.[^ ]'; then
-      git worktree remove "$current_path"
-      echo "changes detected. skipped checkout for $branch" >&2
-      echo "$primary_path"
-      exit 0
-    fi
     git worktree remove "$current_path"
-    git -C "$primary_path" checkout "$branch"
+    if [[ $do_checkout -eq 1 ]]; then
+      if git -C "$primary_path" status --porcelain | grep -Eq '^.[^ ]'; then
+        echo "changes detected. skipped checkout for $branch" >&2
+      else
+        git -C "$primary_path" checkout "$branch"
+      fi
+    fi
     echo "$primary_path"
     ;;
   ls)

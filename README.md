@@ -10,14 +10,17 @@ For bash/zsh.
 gtree add <branch>   # create/add a worktree in $GTREE_DIR
 gtree rm <branch>    # remove the worktree for <branch>
 gtree cd [branch]    # print/cd to worktree (or main repo if omitted)
-gtree packup [-f]    # move from worktree back to main repo on the branch, remove worktree directory and checkout worktree branch
+gtree packup [-f] [-c] # remove worktree directory and return to main repo. -c to immediately checkout worktree branch. -f to ignore untracked changes in worktree dir
 gtree ls             # list worktrees under $GTREE_DIR
 ```
 
 ## Standard workflow
-1. `gtree add my-branch`:  will use (or create if not yet exist) the branch for a new worktree in a default directory, and cd there
-2. do your work, commit what you like
-3. `gtree packup`: delete worktree directory, change back to repo location and check out the branch there
+```
+$ gtree add my-feature
+$ codex
+$ git commit -am "my changes"
+$ gtree packup
+```
 
 If you need to briefly need to jump to your main repo, just use `gtree cd` to get there, and jump back to the worktree with `gtree cd <branch>` (supports auto-complete)
 
