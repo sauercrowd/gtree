@@ -27,6 +27,12 @@ require_git_repo() {
   git rev-parse --show-toplevel >/dev/null 2>&1 || die "not inside a git repository"
 }
 
+repo_dir() {
+  local top=""
+  top="$(git rev-parse --show-toplevel)" || return 1
+  basename "$top"
+}
+
 ensure_dir() {
   mkdir -p "$GTREE_DIR"
 }
@@ -96,7 +102,9 @@ case "$cmd" in
     [[ -n "$branch" ]] || die "missing branch name"
     require_git_repo
     ensure_dir
-    path="${GTREE_DIR%/}/$branch"
+    repo="$(repo_dir)" || die "could not resolve repo name"
+    mkdir -p "${GTREE_DIR%/}/$repo"
+    path="${GTREE_DIR%/}/$repo/$branch"
     if [[ -e "$path" ]]; then
       die "path already exists: $path"
     fi
@@ -110,10 +118,11 @@ case "$cmd" in
     branch="${2:-}"
     [[ -n "$branch" ]] || die "missing branch name"
     require_git_repo
+    repo="$(repo_dir)" || die "could not resolve repo name"
     if path="$(worktree_path_for_branch "$branch")"; then
       git worktree remove "$path"
     else
-      path="${GTREE_DIR%/}/$branch"
+      path="${GTREE_DIR%/}/$repo/$branch"
       [[ -d "$path" ]] || die "no worktree for branch: $branch"
       git worktree remove "$path"
     fi
@@ -125,7 +134,8 @@ case "$cmd" in
       path="$(primary_worktree_path)" || die "could not resolve main worktree"
       echo "$path"
     else
-      path="${GTREE_DIR%/}/$branch"
+      repo="$(repo_dir)" || die "could not resolve repo name"
+      path="${GTREE_DIR%/}/$repo/$branch"
       [[ -d "$path" ]] || die "no worktree directory: $path"
       echo "$path"
     fi
@@ -158,7 +168,8 @@ case "$cmd" in
   ls)
     require_git_repo
     ensure_dir
-    prefix="${GTREE_DIR%/}/"
+    repo="$(repo_dir)" || die "could not resolve repo name"
+    prefix="${GTREE_DIR%/}/$repo/"
     wt=""
     br=""
     in_block=0

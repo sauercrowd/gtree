@@ -87,13 +87,14 @@ create_repo() {
 }
 
 test_add_rm() {
-  local repo gtree_dir
+  local repo gtree_dir repo_name
   repo="$(create_repo)"
+  repo_name="$(basename "$repo")"
   gtree_dir="$(cd "$(make_temp_dir)" && pwd -P)"
   (cd "$repo" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" add feature)
-  assert_file_exists "$gtree_dir/feature" || return 1
+  assert_file_exists "$gtree_dir/$repo_name/feature" || return 1
   (cd "$repo" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" rm feature)
-  assert_file_missing "$gtree_dir/feature" || return 1
+  assert_file_missing "$gtree_dir/$repo_name/feature" || return 1
 }
 
 test_ls_outputs_branches() {
@@ -108,42 +109,45 @@ test_ls_outputs_branches() {
 }
 
 test_cd_paths() {
-  local repo gtree_dir out_main out_branch
+  local repo gtree_dir out_main out_branch repo_name
   repo="$(create_repo)"
+  repo_name="$(basename "$repo")"
   gtree_dir="$(cd "$(make_temp_dir)" && pwd -P)"
   (cd "$repo" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" add feature)
   out_main="$(cd "$repo" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" cd)"
   out_branch="$(cd "$repo" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" cd feature)"
   assert_eq "$repo" "$(cd "$out_main" && pwd -P)" || return 1
-  assert_eq "$gtree_dir/feature" "$(cd "$out_branch" && pwd -P)" || return 1
+  assert_eq "$gtree_dir/$repo_name/feature" "$(cd "$out_branch" && pwd -P)" || return 1
 }
 
 test_packup_success() {
-  local repo gtree_dir out branch
+  local repo gtree_dir out branch repo_name
   repo="$(create_repo)"
+  repo_name="$(basename "$repo")"
   gtree_dir="$(cd "$(make_temp_dir)" && pwd -P)"
   (cd "$repo" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" add feature)
-  out="$(cd "$gtree_dir/feature" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" packup)"
+  out="$(cd "$gtree_dir/$repo_name/feature" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" packup)"
   assert_eq "$repo" "$(cd "$out" && pwd -P)" || return 1
-  assert_file_missing "$gtree_dir/feature" || return 1
+  assert_file_missing "$gtree_dir/$repo_name/feature" || return 1
   branch="$(git -C "$repo" symbolic-ref --quiet --short HEAD)"
   assert_eq "feature" "$branch" || return 1
 }
 
 test_packup_dirty_main() {
-  local repo gtree_dir out status
+  local repo gtree_dir out status repo_name
   repo="$(create_repo)"
+  repo_name="$(basename "$repo")"
   gtree_dir="$(cd "$(make_temp_dir)" && pwd -P)"
   (cd "$repo" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" add feature)
   echo "change" >> "$repo/README"
-  out="$(cd "$gtree_dir/feature" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" packup 2>&1)"
+  out="$(cd "$gtree_dir/$repo_name/feature" && GTREE_DIR="$gtree_dir" "$GTREE_BIN" packup 2>&1)"
   status=$?
   if [[ $status -eq 0 ]]; then
     echo "expected non-zero exit"
     return 1
   fi
   assert_contains "$out" "changes detected. check out worktree with git checkout feature" || return 1
-  assert_file_exists "$gtree_dir/feature" || return 1
+  assert_file_exists "$gtree_dir/$repo_name/feature" || return 1
 }
 
 test_init_output() {
@@ -154,8 +158,9 @@ test_init_output() {
 }
 
 test_init_add_cd() {
-  local repo gtree_dir out
+  local repo gtree_dir out repo_name
   repo="$(create_repo)"
+  repo_name="$(basename "$repo")"
   gtree_dir="$(cd "$(make_temp_dir)" && pwd -P)"
   out="$(
     PATH="$(dirname "$GTREE_BIN"):$PATH"
@@ -165,7 +170,7 @@ test_init_add_cd() {
     GTREE_DIR="$gtree_dir" gtree add feature >/dev/null 2>&1
     pwd -P
   )"
-  assert_eq "$gtree_dir/feature" "$out" || return 1
+  assert_eq "$gtree_dir/$repo_name/feature" "$out" || return 1
 }
 
 run_test "add/rm" test_add_rm
