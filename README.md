@@ -15,12 +15,17 @@ gtree ls             # list worktrees under $GTREE_DIR
 ```
 
 ## Standard workflow
+```bash
+jonas@ente:~/git/my-repo$ gtree add my-feature
+jonas@ente:~/.gtree/trees/my-repo/my-feature$ claude
+jonas@ente:~/.gtree/trees/my-repo/my-feature$ git commit -am "my changes"
+jonas@ente:~/.gtree/trees/my-repo/my-feature$ gtree packup
+jonas@ente:~/git/my-repo$ git branch
+* main
+  my-feature
 ```
-$ gtree add my-feature
-$ codex
-$ git commit -am "my changes"
-$ gtree packup
-```
+
+git packup deletes the worktree and changes back to the main repo. With `gtree packup -c` you can optionally immediately check out the worktree branch
 
 If you need to briefly need to jump to your main repo, just use `gtree cd` to get there, and jump back to the worktree with `gtree cd <branch>` (supports auto-complete)
 
