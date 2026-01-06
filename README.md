@@ -14,7 +14,7 @@ gtree packup [-f]    # move from worktree back to main repo on the branch, remov
 gtree ls             # list worktrees under $GTREE_DIR
 ```
 
-## Workflow
+## Standard workflow
 1. `gtree add my-branch`:  will use (or create if not yet exist) the branch for a new worktree in a default directory, and cd there
 2. do your work, commit what you like
 3. `gtree packup`: delete worktree directory, change back to repo location and check out the branch there
